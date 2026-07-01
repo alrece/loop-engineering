@@ -11,6 +11,8 @@ tags: [loop, retro, iteration]
 
 调用 **loop-engineering** skill 的 `--retro` 模式，执行 **loop-iterate.md** workflow：
 
+> ⚠️ **先读行为规范**：执行任何操作前，必须先读 `AGENTS.md`（铁律 MUST/MUST NOT + 自检清单），全程受其约束。skill 加载时已通过 `@` include 自动带入，若未生效则显式 Read `~/.claude/skills/loop-engineering/AGENTS.md`。
+
 1. `/gsd-complete-milestone`（归档 + 打 tag）
 2. `/retro`（gstack 工程回顾，识别改进点）
 3. `/gsd-extract-learnings`（提取决策/教训/模式 → `.loop/learnings.yaml`）

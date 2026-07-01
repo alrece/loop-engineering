@@ -11,6 +11,8 @@ tags: [loop, status, dashboard]
 
 调用 **loop-engineering** skill 的 `--status` 模式，读取 `.loop/STATE.yaml` 后渲染：
 
+> ⚠️ **先读行为规范**：执行任何操作前，必须先读 `AGENTS.md`（铁律 MUST/MUST NOT + 自检清单），全程受其约束。skill 加载时已通过 `@` include 自动带入，若未生效则显式 Read `~/.claude/skills/loop-engineering/AGENTS.md`。
+
 ```
 ╔══════════════════════════════════════════╗
 ║   Loop Engineering 看板（第 N 轮循环）    ║

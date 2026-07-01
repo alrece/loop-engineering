@@ -11,6 +11,8 @@ tags: [loop, init, setup]
 
 调用 **loop-engineering** skill 的 `--init` 模式：
 
+> ⚠️ **先读行为规范**：执行任何操作前，必须先读 `AGENTS.md`（铁律 MUST/MUST NOT + 自检清单），全程受其约束。skill 加载时已通过 `@` include 自动带入，若未生效则显式 Read `~/.claude/skills/loop-engineering/AGENTS.md`。
+
 1. 在项目根创建 `.loop/` 目录
 2. 写 `.loop/STATE.yaml`（7-Phase 模板：current_phase=1, current_step=ideate, iteration=1）
 3. 创建空资产文件：`learnings.yaml`、`gaps.yaml`、`timeline.jsonl`

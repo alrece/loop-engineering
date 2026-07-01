@@ -28,6 +28,7 @@ Loop Engineering 是一个**编排层**，不重造 gstack/GSD/OpenSpec 已有�
 </objective>
 
 <execution_context>
+@$HOME/.claude/skills/loop-engineering/AGENTS.md
 @$HOME/.claude/get-shit-done/workflows/loop-state.md
 @$HOME/.claude/get-shit-done/workflows/loop-orchestrate.md
 @$HOME/.claude/get-shit-done/workflows/loop-iterate.md

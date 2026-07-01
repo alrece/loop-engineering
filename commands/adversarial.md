@@ -18,6 +18,8 @@ tags: [loop, adversarial, ccg, quality-gate]
 
 调用 **loop-engineering** skill 的 `--adversarial` 模式，执行 **loop-adversarial.md** workflow：
 
+> ⚠️ **先读行为规范**：执行任何操作前，必须先读 `AGENTS.md`（铁律 MUST/MUST NOT + 自检清单），全程受其约束。skill 加载时已通过 `@` include 自动带入，若未生效则显式 Read `~/.claude/skills/loop-engineering/AGENTS.md`。
+
 1. `run_gate`：按环节配置跑检查（loop-adversarial.sh full <step> <path>）
 2. `evaluate`：读 `.loop/adversarial/last-verdict.json` 判定
 3. 若 fail：`auto_optimize`（综合建议→自动修复→重检，最多 3 轮）

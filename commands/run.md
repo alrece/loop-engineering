@@ -9,7 +9,9 @@ tags: [loop, orchestration, workflow]
 
 推进工程闭环。参数：`$ARGUMENTS`
 
-调用 **loop-engineering** skill，按参数路由：
+调用 **loop-engineering** skill，按参数路由。
+
+> ⚠️ **先读行为规范**：执行任何操作前，必须先读 `AGENTS.md`（铁律 MUST/MUST NOT + 自检清单），全程受其约束。skill 加载时已通过 `@` include 自动带入，若未生效则显式 Read `~/.claude/skills/loop-engineering/AGENTS.md`。
 
 - `/loop:run --next` — 检测 `.loop/STATE.yaml`，推进到下一步（调用对应工具，如 `/office-hours`、`/gsd-execute-phase`、`/review` 等）
 - `/loop:run --next --auto` — 链式自动推进，每步完成后自动 re-invoke 直到撞上 blocker（零摩擦跑完整个闭环）
