@@ -12,3 +12,6 @@
 
 # OS
 Thumbs.db
+
+# ZCode 迁移的任务数据（含会话产物/模型IO/检查点，可能含敏感对话内容）
+.zcode-data/
