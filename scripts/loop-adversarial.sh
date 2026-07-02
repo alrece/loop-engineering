@@ -116,6 +116,326 @@ print(json.dumps({'warning_count': len(warns), 'unsynced_docs': unsynced, 'passe
   esac
 }
 
+# ─── 桌面端应用类型检测（v4.2 新增） ───
+# 检测 package.json / tauri.conf / Cargo.toml / go.mod / pubspec.yaml
+# 输出: {"app_type":"electron|tauri|wails|flutter|web","signals":[...],"build_cmd":"..."}
+detect_app_type() {
+  local workdir="${1:-.}"
+  
+  # 检测 package.json
+  if [ -f "$workdir/package.json" ]; then
+    local pkg_json; pkg_json=$(cat "$workdir/package.json")
+    
+    # 检测 electron
+    if echo "$pkg_json" | grep -q '"electron"'; then
+      local build_cmd; build_cmd=$(echo "$pkg_json" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('scripts', {}).get('build') or 'npm run build && electron-builder --dir')
+except:
+    print('npm run build && electron-builder --dir')
+" 2>/dev/null || echo 'npm run build && electron-builder --dir')
+      echo "{\"app_type\":\"electron\",\"signals\":[\"package.json contains 'electron'\",\"dependencies/devDependencies includes electron\"],\"build_cmd\":\"$build_cmd\"}"
+      return
+    fi
+    
+    # 检测 tauri（package.json + src-tauri/）
+    if echo "$pkg_json" | grep -q '"tauri' || [ -d "$workdir/src-tauri" ]; then
+      local build_cmd; build_cmd=$(echo "$pkg_json" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('scripts', {}).get('tauri') or 'npm run tauri build')
+except:
+    print('npm run tauri build')
+" 2>/dev/null || echo 'npm run tauri build')
+      echo "{\"app_type\":\"tauri\",\"signals\":[\"package.json contains 'tauri'\",\"src-tauri/ directory exists\"],\"build_cmd\":\"$build_cmd\"}"
+      return
+    fi
+    
+    # 检测 wails（go + package.json）
+    if [ -f "$workdir/go.mod" ] && echo "$pkg_json" | grep -q '"wails'; then
+      local build_cmd="wails build"
+      echo "{\"app_type\":\"wails\",\"signals\":[\"go.mod exists\",\"package.json contains 'wails'\"],\"build_cmd\":\"$build_cmd\"}"
+      return
+    fi
+    
+    # 前端 web（无 electron/tauri/wails）
+    local build_cmd; build_cmd=$(echo "$pkg_json" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('scripts', {}).get('build') or 'npm run build')
+except:
+    print('npm run build')
+" 2>/dev/null || echo 'npm run build')
+    echo "{\"app_type\":\"web\",\"signals\":[\"package.json exists\",\"no electron/tauri/wails detected\"],\"build_cmd\":\"$build_cmd\"}"
+    return
+  fi
+  
+  # 检测 tauri.conf.json / src-tauri/Cargo.toml
+  if [ -f "$workdir/tauri.conf.json" ] || [ -f "$workdir/src-tauri/Cargo.toml" ]; then
+    local cargo_toml="$workdir/src-tauri/Cargo.toml"
+    [ -f "$cargo_toml" ] || cargo_toml="$workdir/Cargo.toml"
+    
+    if [ -f "$cargo_toml" ] && grep -q 'tauri' "$cargo_toml"; then
+      local build_cmd="npm run tauri build"
+      echo "{\"app_type\":\"tauri\",\"signals\":[\"tauri.conf.json or src-tauri/Cargo.toml exists\",\"Cargo.toml contains 'tauri'\"],\"build_cmd\":\"$build_cmd\"}"
+      return
+    fi
+  fi
+  
+  # 检测 go.mod（wails）
+  if [ -f "$workdir/go.mod" ]; then
+    if grep -q 'wails' "$workdir/go.mod"; then
+      local build_cmd="wails build"
+      echo "{\"app_type\":\"wails\",\"signals\":[\"go.mod exists\",\"go.mod contains 'wails'\"],\"build_cmd\":\"$build_cmd\"}"
+      return
+    fi
+  fi
+  
+  # 检测 pubspec.yaml（flutter）
+  if [ -f "$workdir/pubspec.yaml" ]; then
+    local build_cmd="flutter build"
+    echo "{\"app_type\":\"flutter\",\"signals\":[\"pubspec.yaml exists\"],\"build_cmd\":\"$build_cmd\"}"
+    return
+  fi
+  
+  # fallback：检查 README.md/AGENTS.md 关键字（用户强调"如果包含就得检查"）
+  local readme_files=("$workdir/README.md" "$workdir/AGENTS.md")
+  for rf in "${readme_files[@]}"; do
+    if [ -f "$rf" ]; then
+      local content; content=$(cat "$rf")
+      if echo "$content" | grep -qiE 'electron|tauri|wails|flutter'; then
+        local detected_type; detected_type=$(echo "$content" | grep -oiE '(electron|tauri|wails|flutter)' | head -1 | tr '[:upper:]' '[:lower:]')
+        local app_type="web"
+        case "$detected_type" in
+          electron) app_type="electron" ;;
+          tauri)    app_type="tauri" ;;
+          wails)    app_type="wails" ;;
+          flutter)  app_type="flutter" ;;
+        esac
+        local build_cmd="npm run build"
+        case "$app_type" in
+          electron) build_cmd="npm run build && electron-builder --dir" ;;
+          tauri)    build_cmd="npm run tauri build" ;;
+          wails)    build_cmd="wails build" ;;
+          flutter)  build_cmd="flutter build" ;;
+        esac
+        echo "{\"app_type\":\"$app_type\",\"signals\":[\"README/AGENTS.md contains '$detected_type' keyword\"],\"build_cmd\":\"$build_cmd\"}"
+        return
+      fi
+    fi
+  done
+  
+  # 默认：web
+  echo "{\"app_type\":\"web\",\"signals\":[\"no desktop framework detected\"],\"build_cmd\":\"npm run build\"}"
+}
+
+# ─── 前端质量门（v4.2 新增） ───
+# spec: 检查 openspec/changes/ 是否含前端 UI spec
+# design-ui: 检查是否 Vue3 + 业务页面（非空壳）
+# ship: 检查 compose frontend 是否被 profiles 隐藏
+verify_frontend() {
+  local phase="$1" path="${2:-.}"
+  
+  case "$phase" in
+    spec)
+      # 检查 openspec/changes/ 是否含前端 UI spec（关键词：ui/page/component）
+      local ui_spec_found=false
+      if [ -d "$path/openspec/changes" ]; then
+        local spec_files; spec_files=$(find "$path/openspec/changes" -name "*.md" 2>/dev/null)
+        for sf in $spec_files; do
+          if grep -qiE 'ui|page|component|frontend|界面' "$sf" 2>/dev/null; then
+            ui_spec_found=true
+            break
+          fi
+        done
+      fi
+      
+      local passed; passed=$([ "$ui_spec_found" = "true" ] && echo true || echo false)
+      local signals; signals=$(if [ "$ui_spec_found" = "true" ]; then echo "[\"frontend UI spec found in openspec/\"]"; else echo "[\"no frontend UI spec detected\"]"; fi)
+      echo "{\"gate\":\"frontend\",\"phase\":\"spec\",\"passed\":$passed,\"signals\":$signals}"
+      ;;
+    design-ui)
+      # 检查 design-html / ~/.gstack/projects/*/designs/ 是否含 Vue3 业务页面
+      local vue_files=()
+      
+      # 检查 ~/.gstack/projects/*/designs/（gstack /design-html 默认输出位置）
+      local gstack_designs="$HOME/.gstack/projects"
+      if [ -d "$gstack_designs" ]; then
+        for proj_dir in "$gstack_designs"/*/; do
+          local designs_dir="$proj_dir/designs"
+          [ -d "$designs_dir" ] || continue
+          for vf in "$designs_dir"/*.vue; do
+            [ -f "$vf" ] && vue_files+=("$vf")
+          done
+        done
+      fi
+      
+      # 检查当前项目目录下的 .vue 文件（设计产出可能在此）
+      if [ -d "$path" ]; then
+        while IFS= read -r -d '' vf; do
+          vue_files+=("$vf")
+        done < <(find "$path" -name "*.vue" -type f -print0 2>/dev/null)
+      fi
+      
+      # 判定：至少有一个业务页面（非空壳）
+      local passed=false
+      local signals='[]'
+      if [ ${#vue_files[@]} -gt 0 ]; then
+        # 检查是否是空壳（仅含模板占位符）
+        local real_pages=0
+        for vf in "${vue_files[@]}"; do
+          if ! grep -qE '(<template>|<script>|setup\(\)|defineProps|defineEmits)' "$vf" 2>/dev/null; then
+            continue
+          fi
+          # 过滤仅含 auth/dashboard/exception 的空壳（v4.2 现状）
+          if grep -qE '(auth|dashboard|exception)' "$vf" 2>/dev/null; then
+            real_pages=$((real_pages + 1))
+          fi
+        done
+        
+        # 至少有一个业务页面才算通过（空壳不算）
+        passed=$([ $real_pages -gt 0 ] && echo true || echo false)
+        signals="[\"found ${#vue_files[@]} .vue files\", \"real business pages: $real_pages\"]"
+      else
+        signals="[\"no .vue files found\"]"
+      fi
+      
+      echo "{\"gate\":\"frontend\",\"phase\":\"design-ui\",\"passed\":$passed,\"signals\":$signals}"
+      ;;
+    ship)
+      # 检查 docker-compose.yml 的 frontend 服务是否被 profiles 隐藏
+      local compose_files=("$path/docker-compose.yml" "$path/docker-compose.yaml")
+      local passed=true
+      local signals='[]'
+      
+      for cf in "${compose_files[@]}"; do
+        if [ -f "$cf" ]; then
+          # 检查 frontend 服务
+          if grep -q '^  frontend:' "$cf" || grep -q 'frontend:' "$cf"; then
+            # 检查 profiles 隐藏
+            if grep -A5 '^  frontend:' "$cf" | grep -q 'profiles:.*full'; then
+              passed=false
+              signals='["frontend service found but hidden by profiles:[\"full\"]"]'
+            else
+              signals='["frontend service present, not hidden by profiles"]'
+            fi
+          else
+            # 无 frontend 服务
+            passed=false
+            signals='["no frontend service in docker-compose"]'
+          fi
+          break
+        fi
+      done
+      
+      [ ${#signals[@]} -eq 0 ] && signals='["no docker-compose found"]'
+      echo "{\"gate\":\"frontend\",\"phase\":\"ship\",\"passed\":$passed,\"signals\":$signals}"
+      ;;
+    *)
+      echo "{\"gate\":\"frontend\",\"phase\":\"unknown\",\"passed\":false,\"signals\":[\"unsupported phase: $phase\"]}"
+      ;;
+  esac
+}
+
+# ─── 构建验证门（v4.2 新增） ───
+# 根据 detect_app_type 的输出，执行对应技术栈的构建验证
+verify_build() {
+  local path="${1:-.}"
+  
+  # 先检测应用类型
+  local app_info; app_info=$(detect_app_type "$path")
+  local app_type; app_type=$(echo "$app_info" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('app_type', 'web'))
+except:
+    print('web')
+" 2>/dev/null || echo "web")
+  
+  local build_cmd; build_cmd=$(echo "$app_info" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('build_cmd', 'npm run build'))
+except:
+    print('npm run build')
+" 2>/dev/null || echo "npm run build")
+  
+  local passed=true
+  local signals="[]"
+  local error_msg=""
+  
+  # 根据 app_type 执行构建命令
+  case "$app_type" in
+    web)
+      if [ -f "$path/package.json" ]; then
+        (cd "$path" && npm run build >/dev/null 2>&1) || { passed=false; error_msg="npm run build failed"; }
+      else
+        passed=false
+        error_msg="no package.json found"
+      fi
+      signals="[\"app_type: web\", \"build_cmd: $build_cmd\"]"
+      ;;
+    electron)
+      if [ -f "$path/package.json" ]; then
+        # 先构建前端，再 electron-builder --dir（不打包，只验证能编译）
+        (cd "$path" && npm run build >/dev/null 2>&1) || { passed=false; error_msg="npm run build failed"; }
+        if [ "$passed" = "true" ]; then
+          (cd "$path" && npx electron-builder --dir 2>/dev/null) || { passed=false; error_msg="electron-builder --dir failed"; }
+        fi
+      else
+        passed=false
+        error_msg="no package.json found"
+      fi
+      signals="[\"app_type: electron\", \"build_cmd: $build_cmd\"]"
+      ;;
+    tauri)
+      if [ -f "$path/package.json" ]; then
+        # 先构建前端，再 tauri build --debug（只调试模式打包验证）
+        (cd "$path" && npm run build >/dev/null 2>&1) || { passed=false; error_msg="npm run build failed"; }
+        if [ "$passed" = "true" ]; then
+          (cd "$path" && npx tauri build --debug 2>/dev/null) || { passed=false; error_msg="tauri build --debug failed"; }
+        fi
+      else
+        passed=false
+        error_msg="no package.json found"
+      fi
+      signals="[\"app_type: tauri\", \"build_cmd: $build_cmd\"]"
+      ;;
+    wails)
+      if [ -f "$path/go.mod" ]; then
+        (cd "$path" && wails build 2>/dev/null) || { passed=false; error_msg="wails build failed"; }
+      else
+        passed=false
+        error_msg="no go.mod found"
+      fi
+      signals="[\"app_type: wails\", \"build_cmd: $build_cmd\"]"
+      ;;
+    flutter)
+      if [ -f "$path/pubspec.yaml" ]; then
+        (cd "$path" && flutter build 2>/dev/null) || { passed=false; error_msg="flutter build failed"; }
+      else
+        passed=false
+        error_msg="no pubspec.yaml found"
+      fi
+      signals="[\"app_type: flutter\", \"build_cmd: $build_cmd\"]"
+      ;;
+    *)
+      passed=false
+      error_msg="unknown app_type: $app_type"
+      signals="[\"app_type: $app_type\", \"build_cmd: $build_cmd\"]"
+      ;;
+  esac
+  
+  [ -n "$error_msg" ] && passed=false
+  echo "{\"gate\":\"build\",\"app_type\":\"$app_type\",\"passed\":$passed,\"signals\":$signals,\"error\":${error_msg:+\"$error_msg\"}}"
+}
+
 # ─── 多模型对抗审查 ───
 # 并行调 codex + gemini，绕过 config.toml 缺陷，输出隔离
 # 参数: <workdir> [ref, 默认 HEAD]
@@ -284,22 +604,53 @@ print(json.dumps(arr))
   case "$phase" in
     spec)
       append_result "$(run_deterministic change "$path")"
+      # v4.2 前端 UI spec 检查
+      append_result "$(verify_frontend "$phase" "$path")"
       ;;
     design)
       # 设计环节只跑多模型（无确定性门）
       : ;;
+    replicate)
+      # v4.1 参考项目复刻环节（无确定性门，只跑多模型）
+      : ;;
+    design-consult)
+      # v4 前端参考环节（无确定性门，只跑多模型）
+      : ;;
+    design-ui)
+      # v4 前端设计环节：检查 Vue3 业务页面
+      append_result "$(verify_frontend "$phase" "$path")"
+      # v4.2 构建验证（前端）
+      append_result "$(verify_build "$path")"
+      ;;
     plan)
       append_result "$(run_deterministic module "$path")"
+      # v4.2 前端 plan 检查
+      append_result "$(verify_frontend "$phase" "$path")"
       ;;
-    execute|review|ship)
+    execute)
+      # v4.2 execute 是 plan 级（逐 plan 模式），只跑安全门 + 质量门
       for g in security quality; do
         append_result "$(run_deterministic "$g" "$path")"
       done
-      [ "$phase" = "ship" ] && append_result "$(run_deterministic module "$path")"
+      # v4.2 前端 plan 额外跑 /design-review（视觉 QA）→ 由 loop-orchestrate 的 execute_plan_by_plan 调用
+      ;;
+    review)
+      for g in security quality; do
+        append_result "$(run_deterministic "$g" "$path")"
+      done
+      ;;
+    ship)
+      for g in security quality; do
+        append_result "$(run_deterministic "$g" "$path")"
+      done
+      append_result "$(run_deterministic module "$path")"
+      # v4.2 前端/desktop 门
+      append_result "$(verify_frontend "$phase" "$path")"
+      append_result "$(verify_build "$path")"
       ;;
     *)
       rm -f "$tmp_results"
-      die "未知环节: $phase (可选: spec/design/plan/execute/review/ship)"
+      die "未知环节: $phase (可选: spec/design/replicate/design-consult/design-ui/plan/execute/review/ship)"
       ;;
   esac
 
@@ -452,7 +803,7 @@ loop-adversarial.sh — Loop Engineering 对抗性质量门引擎
       并行调 codex+gemini 对 git diff 做对抗审查
 
   loop-adversarial.sh full <phase> <path> [ref]
-      phase ∈ {spec, design, plan, execute, review, ship}
+      phase ∈ {spec, design, replicate, design-consult, design-ui, plan, execute, review, ship}
       完整质量门（确定性 + 多模型），写 last-verdict.json
       execute 的 path 可为 plan 级 git diff 范围（逐 plan 模式）
 

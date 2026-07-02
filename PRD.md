@@ -146,6 +146,21 @@ Loop Engineering 把它们按"看/做/写/守/对抗"的职能切片串成一条
 - **不重造** gstack /review 或 /cso（CCG 对抗层是独立多模型视角，互补不冲突）
 - **不内置** TDD/调试（Superpowers 自动守）
 
+### v4.2 新增能力边界（前端/桌面端支持）
+
+- **必做**：
+  - 前端生命周期完整覆盖（参考→复刻→设计→实现→测试→部署）
+  - 桌面端技术栈自动检测（Electron/Tauri/Wails/Flutter/Web）
+  - 构建验证门确保前端代码可编译（npm run build / tauri build / wails build / flutter build）
+  - 部署配置检查确保 frontend 服务不被 profiles 隐藏
+  - Vue3 业务页面生成（design-html）+ impeccable 品质打磨（21 子 skill）
+  - QA 环节真实浏览器自动化（Playwright 测真实 Vue3 SPA）
+
+- **不做**：
+  - 不生成桌面端原生代码（Electron/tauri.conf.json 等配置文件仍需用户维护）
+  - 不执行完整 Electron/tauri 构建（只跑 `npm run build` + debug 模式，生产构建仍需用户手动 `tauri build`）
+  - 不替代 Electron/Flutter 官方 CLI（只调用其构建命令，不重造）
+
 ---
 
 ## 八、依赖

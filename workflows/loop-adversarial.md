@@ -18,16 +18,22 @@ Loop Engineering 的对抗性质量门。在闭环每个环节产出后，对产
 
 | 环节(step) | 确定性门 | 多模型对抗 | 检查对象 |
 |------------|---------|-----------|---------|
-| spec(规格) | verify-change(--mode staged) | codex/gemini analyzer | openspec/changes/ + **前端 UI spec 是否存在**（页面/组件/交互/视觉参考） |
+| spec(规格) | verify-change(--mode staged) + **frontend(spec)** | codex/gemini analyzer | openspec/changes/ + **前端 UI spec 是否存在**（页面/组件/交互/视觉参考） |
 | design(设计) | —（无确定性门） | codex/gemini 审 design-reviews.md | 审核结论 |
 | **design-consult**(前端参考) | — | codex/gemini 审 DESIGN.md | **DESIGN.md 是否生成 + 是否有竞品参考来源** |
-| **design-ui**(前端设计) | — | codex/gemini 审前端代码 | **design-html 是否产出前端代码 + 是否 Vue3 框架 + 是否有业务页面（非空壳）** |
-| plan(规划) | verify-module .planning/ | codex/gemini 审 PLAN.md | PLAN.md + **是否含前端业务页面 plan（不只骨架）** |
-| execute(执行) | verify-security + verify-quality + verify-change | codex/gemini reviewer 审 git diff | **plan 级** + 前端 plan 额外跑 `/design-review`（视觉 QA） |
-| review(审查) | verify-security | 对比 gstack /review 与多模型结论 | 审查一致性 |
-| ship(发布前) | verify-security + verify-module | codex/gemini 终审 | 全量 + **前端服务是否在 compose 且不被 profiles 隐藏 + 有 make deploy** |
+| **design-ui**(前端设计) | **frontend(design-ui)** + **build** | codex/gemini 审前端代码 | **design-html 是否产出前端代码 + 是否 Vue3 框架 + 是否有业务页面（非空壳）** |
+| **replicate**(参考复刻) | — | codex/gemini 审复刻产物 | **7步逆向工程文档是否齐全** |
+| plan(规划) | verify-module .planning/ + **frontend(plan)** | codex/gemini 审 PLAN.md | PLAN.md + **是否含前端业务页面 plan（不只骨架）** |
+| execute(执行) | verify-security + verify-quality + **frontend(plan)** | codex/gemini reviewer 审 git diff | **plan 级** + 前端 plan 额外跑 `/design-review`（视觉 QA） |
+| review(审查) | verify-security + **frontend(ship)** | 对比 gstack /review 与多模型结论 | 审查一致性 |
+| ship(发布前) | verify-security + verify-module + **frontend(ship)** + **build** | codex/gemini 终审 | 全量 + **前端服务是否在 compose 且不被 profiles 隐藏 + 有 make deploy** |
 
 **execute 环节是 plan 级检查**（v2 逐 plan 模式）：loop-orchestrate 的 execute_plan_by_plan 每跑完一个 plan，对该 plan 的 git diff 范围（`git diff <plan起始commit>..HEAD`）跑质量门，而非整个 phase。脚本 target_path 接受 plan 的文件范围或 commit 范围。
+
+**v4.2 新增桌面端全链路支持**：
+- detect_app_type：检测 electron/tauri/wails/flutter/web
+- verify_frontend：spec/design-ui/ship 三个环节的前端检查
+- verify_build：根据应用类型执行对应构建命令（npm/run build/tauri build/wails build/flutter build）
 
 不检查的环节：ideate(构想, 无代码)、discuss(讨论, 无产物)、qa(浏览器测试由 gstack /qa 负责)、verify(UAT 由 GSD 负责)、retro(复盘, 非产出)。
 这些环节质量由各自的主工具保障，不需要对抗层。
