@@ -18,6 +18,7 @@
 8. **用中文输出**（遵循全局 AGENTS.md/CLAUDE.md 语言规则），代码/命令/路径/专有名词除外。
 9. **状态变更写回 STATE.yaml（原子写）+ 追加 timeline.jsonl**，保证可审计可恢复。
 10. **前端生命周期必须完整 + 设计能力全家桶**（v4.2）：Route 3.4（参考项目复刻，有 reference_target 时执行 7 步逆向工程）→ Route 3.5（teach-impeccable 采集上下文 + ui-ux-pro-max 设计决策 + design-taste-frontend 防 AI 套路 + /design-consultation 竞品参考）→ Route 3.6（/design-shotgun 变体 + /design-html Vue3 代码 + **impeccable 21 子 skill 品质打磨**）不可跳过（Route 3.4 无参考时可跳过）。前端产出后必须经过 impeccable 品质打磨（至少 critique + polish），不能只"能用"就交付。spec 必须含前端 UI spec，plan 必须含前端业务页面 plan，部署必须含 frontend 且不被 profiles 隐藏。
+11. **`/loop:refine` 总是生成三套提示词，必须让用户选，不得替用户选**（v4.3）：接收一句话需求 → 8 维度深度分析缺失点 → 用 AskUserQuestion 一次动态追问 3-6 个问题 → **总是**产出三套（标准/精简/高阶强约束）→ 用 AskUserQuestion 让用户选一套 → 写入 `.loop/refined-prompt.md`。agent 不擅自定版、不臆测缺失维度（缺失即追问）、不跳过追问环节。
 
 ### MUST NOT
 1. **不得在 --auto 模式下因"需要人工决策"而停**——那是 --interactive 的行为。--auto 只因硬障碍停（编译失败3轮无效/依赖缺失/escalate超限/用户暂停）。
@@ -37,6 +38,15 @@
 2. 创建 `.loop/` 目录 + STATE.yaml（7-Phase 模板）+ learnings.yaml/gaps.yaml/timeline.jsonl（空）+ adversarial/（空）
 3. STATE.yaml 初始化：`current_phase: 1, current_step: ideate, iteration: 1`
 4. 询问是否立即调 `/office-hours` 进入构想
+
+### `/loop:refine <提示词>`（v4.3 新增）
+提示词专业化优化器，横切工具（不依赖 init、不推进闭环）。完全交给 loop-refine.md workflow：
+1. 接收用户的一句话需求（`$ARGUMENTS`），按 8 个维度深度分析（目标用户/核心场景/技术栈/规模性能/鉴权安全/优先级MVP/既有代码约束/验收标准）
+2. 基于分析**动态生成 3-6 个追问**（针对缺失/模糊维度），用 AskUserQuestion 一次并行追问
+3. 综合答复后**总是产出三套**：标准版（日常使用，层级清晰）/ 精简版（迭代对话，紧凑）/ 高阶强约束版（AI Agent 强化：强制文件读取 + 鉴权保护 + 原有逻辑保护 + 质量门强制）
+4. 用 AskUserQuestion 让用户选一套——**agent 不替选**
+5. 写入 `.loop/refined-prompt.md`（含原始提示词/追问记录/三套全文/选定版本）
+6. 提示下一步：`/office-hours`（带优化后提示词）或 `/loop:run --next`。**不自动调用**
 
 ### `/loop:status`
 1. 读 STATE.yaml
@@ -209,3 +219,5 @@
 - [ ] 是否遵守"按阶段唯一裁决"（没并行两套工具）？
 - [ ] 是否用中文输出（代码/路径除外）？
 - [ ] 是否没修改 CCG/GSD/gstack 任何文件、没自行加 --force？
+- [ ] **/loop:refine**：是否总是生成三套（标准/精简/高阶强约束）并用 AskUserQuestion 让用户选（没替选）？
+- [ ] **/loop:refine**：是否对缺失维度动态追问 3-6 个问题（没臆测、没跳过追问）？

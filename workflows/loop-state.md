@@ -25,6 +25,7 @@ phase_status:
   2: { status: pending, step: null, blockers: [], artifacts: [] }
   # ... 1-7
 artifacts:                  # 跨工具产物追踪（相对项目根的路径）
+  refine: .loop/refined-prompt.md    # v4.3 /loop:refine 产出（提示词优化：原始/追问记录/三套/选定版）
   ideate: .loop/ideation.md          # /office-hours 产出
   spec: openspec/changes/            # OpenSpec specs
   design: .loop/design-reviews.md    # 三重审核记录
