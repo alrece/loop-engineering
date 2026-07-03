@@ -1,105 +1,117 @@
-# Loop Engineering — 安装说明
+> [English](./INSTALL.md) | [简体中文](./README.zh-CN.md#installation)
 
-> 本目录是 loop engineering 工程的完整源码副本（脱离 `~/.claude` 环境的独立仓库）。
-> 包含：skill 核心、workflow、命令、对抗检查脚本、工程记忆（监控日志+改进素材）。
+# Loop Engineering — Installation Guide
+
+> This directory is a complete source copy of the loop engineering project (a standalone repository independent of the `~/.claude` environment).
+> It includes: skill core, workflows, commands, adversarial-check scripts, and engineering memory (monitoring logs + improvement materials).
 
 ---
 
-## 目录结构
+## Directory Structure
 
 ```
 loop-engineering/
-├── SKILL.md                      # skill 入口（极简骨架，@ include 4 个 workflow）
-├── AGENTS.md                     # AI agent 行为规范（铁律 MUST/MUST NOT + 自检清单）
-├── README.md                     # 人类使用说明（命令速查 + 7-Phase 闭环）
-├── PRD.md                        # 产品需求文档（能力边界 + 成功标准）
-├── INSTALL.md                    # 本文件（安装说明）
+├── SKILL.md                      # skill entry (minimal skeleton, @ includes 4 workflows)
+├── AGENTS.md                     # AI agent behavior spec (iron rules MUST/MUST NOT + self-check list)
+├── README.md                     # human usage guide (command reference + 7-Phase loop)
+├── PRD.md                        # product requirements doc (capability boundaries + success criteria)
+├── INSTALL.md                    # this file (installation guide)
 ├── scripts/
-│   └── loop-adversarial.sh       # 对抗检查引擎（确定性质量门 + 多模型对抗 + decide-large）
-├── workflows/                    # 逻辑外置的 workflow（被 SKILL.md @ include）
-│   ├── loop-state.md             # 状态机 + 5 道安全门（Gate 1-5）
-│   ├── loop-orchestrate.md       # 编排核心（14 路由 + run_full_loop + decide_best）
-│   ├── loop-iterate.md           # 迭代回环（retro → 教训 → 审计 → 下一轮种子）
-│   ├── loop-adversarial.md       # 对抗质量门（检查→优化→重检循环）
-│   └── replicate-workflow.md     # 前端 UI 复刻（7 步逆向工程）
-├── commands/                     # slash 命令入口
+│   └── loop-adversarial.sh       # adversarial-check engine (deterministic quality gates + multi-model adversarial + decide-large)
+├── workflows/                    # externally-located logic workflows (@ included by SKILL.md)
+│   ├── loop-state.md             # state machine + 5 safety gates (Gate 1-5)
+│   ├── loop-orchestrate.md       # orchestration core (14 routes + run_full_loop + decide_best)
+│   ├── loop-iterate.md           # iteration loop (retro → learnings → audit → next-round seed)
+│   ├── loop-adversarial.md       # adversarial quality gate (check → optimize → re-check loop)
+│   └── replicate-workflow.md     # frontend UI replication (7-step reverse engineering)
+├── commands/                     # slash command entries
 │   ├── run.md                    # /loop:run [--next --auto|--interactive|--force]
-│   ├── status.md                 # /loop:status（只读看板）
-│   ├── init.md                   # /loop:init [项目名] [--reference <url|repo>]
-│   ├── retro.md                  # /loop:retro（迭代回环）
-│   └── adversarial.md            # /loop:adversarial [step]（手动对抗检查）
-└── monitoring/                   # 工程记忆（zllmwiki 实测收集的改进素材）
-    ├── improvement-materials.md  # 10 条改进素材（边跑边修的完整记录）
-    ├── scan-20260625.log         # 监控扫描日志
+│   ├── status.md                 # /loop:status (read-only dashboard)
+│   ├── init.md                   # /loop:init [project name] [--reference <url|repo>]
+│   ├── retro.md                  # /loop:retro (iteration loop)
+│   └── adversarial.md            # /loop:adversarial [step] (manual adversarial check)
+└── monitoring/                   # engineering memory (improvement materials gathered from real zllmwiki runs)
+    ├── improvement-materials.md  # 10 improvement materials (full record of fix-while-running)
+    ├── scan-20260625.log         # monitoring scan log
     └── scan-20260626.log
 ```
 
 ---
 
-## 安装到 ZCode（让 /loop:* 命令生效）
+## Install to ZCode (to enable /loop:* commands)
 
 ### 1. skill + scripts
 ```bash
-# 复制 skill 目录到 ZCode 的 skill 存储
+# Copy the skill directory to ZCode's skill store
 cp -r loop-engineering ~/.claude/skills/loop-engineering
-# 建符号链接让 ZCode 发现
+# Create a symlink so ZCode discovers it
 ln -sf ~/.claude/skills/loop-engineering ~/.zcode/skills/loop-engineering
 ```
 
+> **中文译注**：把 skill 目录复制到 ZCode 的技能存储位置，并建立符号链接让 ZCode 能发现它。脚本随 skill 一起被复制过去。
+
 ### 2. workflow
 ```bash
-# 复制到 GSD 的 workflow 目录（SKILL.md 用 @ include 引用它们）
+# Copy to GSD's workflow directory (SKILL.md @ includes them)
 cp loop-engineering/workflows/*.md ~/.claude/get-shit-done/workflows/
 ```
 
-### 3. 命令
+> **中文译注**：把 workflow 文件复制到 GSD 的工作流目录。SKILL.md 通过 `@ include` 引用它们，放错位置会导致 skill 找不到逻辑。
+
+### 3. commands
 ```bash
-# 复制到 ZCode 的命令目录
+# Copy to ZCode's command directory
 mkdir -p ~/.zcode/commands/loop
 cp loop-engineering/commands/*.md ~/.zcode/commands/loop/
 ```
 
-### 4. 脚本可执行权限
+> **中文译注**：把 slash 命令文件放到 ZCode 的命令目录下。`mkdir -p` 会自动创建不存在的父目录。
+
+### 4. script executable permission
 ```bash
 chmod +x ~/.claude/skills/loop-engineering/scripts/loop-adversarial.sh
 ```
 
-### 5. 重启 ZCode 会话，验证
+> **中文译注**：给对抗检查引擎脚本加可执行权限，否则脚本无法被调用。
+
+### 5. restart ZCode session and verify
 ```bash
-/loop:status   # 应输出闭环看板
+/loop:status   # should output the loop dashboard
 ```
 
+> **中文译注**：重启 ZCode 会话后，运行 `/loop:status` 验证安装。如果看到闭环看板输出，说明安装成功。
+
 ---
 
-## 依赖（必须已装）
+## Dependencies (must be pre-installed)
 
-loop 是编排层，不重造能力，依赖以下工具家族已安装：
+loop is an orchestration layer; it does not reinvent capabilities and depends on the following tool families already being installed:
 
-| 依赖 | 用途 |
+| Dependency | Purpose |
 |------|------|
-| **gstack** | 看（office-hours / plan-*-review / review / cso / qa / ship / design-* / browse） |
-| **GSD** | 做（gsd-new-project / discuss / plan / execute / verify / complete-milestone） |
-| **OpenSpec** + /opsx | 写（规格定义） |
-| **Superpowers** | 守（TDD / 调试自动触发） |
-| **CCG** | 对抗（verify-security/quality/change/module + codeagent-wrapper 多模型 + impeccable 设计打磨） |
-| **设计能力全家桶** | ui-ux-pro-max（设计决策）+ design-taste-frontend（防套路）+ impeccable（品质打磨） |
+| **gstack** | review (office-hours / plan-*-review / review / cso / qa / ship / design-* / browse) |
+| **GSD** | build (gsd-new-project / discuss / plan / execute / verify / complete-milestone) |
+| **OpenSpec** + /opsx | spec (specification definition) |
+| **Superpowers** | guard (TDD / debugging auto-trigger) |
+| **CCG** | adversarial (verify-security/quality/change/module + codeagent-wrapper multi-model + impeccable design polish) |
+| **Design capability suite** | ui-ux-pro-max (design decisions) + design-taste-frontend (anti-cliché) + impeccable (quality polish) |
 
 ---
 
-## 版本演进（v1 → v4.2）
+## Version History (v1 → v4.2)
 
-| 版本 | 核心改进 | 触发素材 |
+| Version | Core improvements | Trigger material |
 |------|---------|---------|
-| v1 | 保守模式（撞决策就停） | 初始设计 |
-| v2 | 全自动哲学（--auto 默认） + 逐 plan 执行 | 素材 #4（execute 卡死） |
-| v3 | Skill() 调用 | 素材 #8（SlashCommand 断链） |
-| v3.1 | inline 执行（最终机制） | 素材 #9（Skill() ZCode 不可用） |
-| v4 | 前端生命周期补全 | 素材 #10（部署后无界面） |
-| v4.1 | 前端 UI 复刻（7 步） | 复刻流程需求 |
-| v4.2 | 设计能力全家桶接入 | impeccable/taste/ui-ux-pro-max |
+| v1 | Conservative mode (stops on any decision) | Initial design |
+| v2 | Full-autonomous philosophy (--auto default) + plan-by-plan execution | Material #4 (execute deadlock) |
+| v3 | Skill() invocation | Material #8 (SlashCommand breakage) |
+| v3.1 | inline execution (final mechanism) | Material #9 (Skill() unavailable in ZCode) |
+| v4 | Frontend lifecycle completion | Material #10 (no UI after deployment) |
+| v4.1 | Frontend UI replication (7 steps) | Replication workflow requirement |
+| v4.2 | Full design-capability integration | impeccable/taste/ui-ux-pro-max |
 
 ---
 
-## 工程记忆的价值
+## Value of Engineering Memory
 
-`monitoring/improvement-materials.md` 记录了 10 条从 zllmwiki 真实项目实测收集的改进素材，每条含：发现时间、严重度、实测影响、根因、修复方案、修复状态。这是 loop engineering 持续改进的事实依据，为后续项目打基础。
+`monitoring/improvement-materials.md` records 10 improvement materials gathered from real zllmwiki project runs. Each entry includes: discovery time, severity, observed impact, root cause, fix plan, and fix status. This is the factual basis for loop engineering's continuous improvement and lays the groundwork for subsequent projects.

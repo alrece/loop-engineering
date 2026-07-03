@@ -1,3 +1,4 @@
+<!-- Internal engineering notes — not translated. 内部工程素材，保留中文原貌，未翻译。 -->
 # Loop Engineering 改进素材收集
 
 > 来源：zllmwiki 项目实测 loop 工程的过程观察

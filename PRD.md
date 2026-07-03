@@ -1,195 +1,203 @@
-# Loop Engineering — 产品需求文档（PRD）
+# Loop Engineering — Product Requirements Document (PRD)
 
-> 版本：1.2（含提示词专业化优化 v4.3）
-> 状态：已实现
-> 关联文档：README.md（使用说明）、AGENTS.md（AI agent 规范）
-
----
-
-## 一、产品定位
-
-**一句话**：Loop Engineering 是一个跨工具编排层，把 gstack / OpenSpec / GSD / Superpowers / CCG 五大工具家族编排成带质量保障的、可自动循环的工程闭环。
-
-**它解决的核心问题**：
-这些工具各自强大但**各自为政**——gstack 擅长审核却不管执行、GSD 擅长执行却不覆盖构想、OpenSpec 写规格但不审查、CCG 有对抗检查能力却不参与流程编排。用户要手动在工具间切换、手动判断该用谁、手动保证质量，认知负担重且容易遗漏环节。
-
-Loop Engineering 把它们按"看/做/写/守/对抗"的职能切片串成一条**自动循环的流水线**，并在每个环节嵌入质量门，让用户只需 `/loop:run --next --auto` 就能跑完从构想到发布再到复盘的完整闭环。
+> Version: 1.2 (with Prompt Refinement v4.3)
+> Status: Implemented
+> Related docs: README.md (user guide), AGENTS.md (AI agent spec)
 
 ---
 
-## 二、目标用户与场景
+## 1. Product Positioning (产品定位)
 
-**目标用户**：使用 ZCode（OpenCode 内核）+ 上述工具家族的开发者/团队。
+**In one sentence**: Loop Engineering is a cross-tool orchestration layer that wires five tool families — gstack / OpenSpec / GSD / Superpowers / CCG — into a quality-assured, auto-looping engineering closed loop.
 
-**核心场景**：
-1. 从零启动新项目（构想→交付全流程）
-2. 多工具协作时的"该用谁"决策
-3. 保证每个环节产出质量（对抗检查）
-4. 跨会话/跨里程碑的迭代闭环
-5. 中断恢复与进度看板
+> **中文译注**：Loop Engineering 是一个跨工具编排层，把 gstack / OpenSpec / GSD / Superpowers / CCG 五大工具家族编排成带质量保障的、可自动循环的工程闭环。
 
----
+**Core problem it solves**:
+Each of these tools is powerful in its own right but they operate **independently** — gstack excels at review but doesn't execute, GSD excels at execution but doesn't cover ideation, OpenSpec writes specs but doesn't review them, CCG has adversarial-check capability but doesn't participate in flow orchestration. Users must manually switch between tools, manually decide which to invoke, and manually ensure quality — high cognitive load and easy to miss steps.
 
-## 三、核心能力（已实现）
+> **中文译注**：这些工具各自强大但各自为政——用户要手动在工具间切换、手动判断该用谁、手动保证质量，认知负担重且容易遗漏环节。
 
-### 能力 1：全自动长程闭环（v2 核心）
-**设计哲学**：提出想法 → 大致规划 → 自动跑完整个项目（决策点用最佳方案自动选择），最后才叫用户验证。
-- `--auto`（默认）：全自动，只有硬障碍才停（编译失败3轮无效/依赖缺失/escalate超限/用户暂停）
-- `--interactive`（可选）：保守模式，撞决策就停（v1 行为）
-- 11 路由按阶段唯一裁决调用最强工具，execute 走逐 plan 模式
-
-| 路由 | 环节 | 主工具 |
-|------|------|--------|
-| 1 | 构想 | `/office-hours` |
-| 2 | 规格 | `/opsx:propose` |
-| 3 | 设计 | 三重审核（--auto 自动裁决分歧，不停） |
-| 4-6 | 讨论/规划/执行 | `/gsd-discuss/plan` + **逐 plan 执行（gsd-executor）** |
-| 7-9 | 审查/QA/验收 | `/review`+`/cso` / `/qa` / `/gsd-verify-work` |
-| 10 | 发布 | `/ship`→`/canary`→`/land-and-deploy` |
-| 11 | 迭代 | `/gsd-complete-milestone` + retro（--auto 自动进下一轮） |
-
-### 能力 2：分层决策（v2 新增）
-- **小决策**（命名/参数/实现细节/非关键库）→ loop 基于 spec/上下文自主选最佳
-- **大决策**（架构/范围/关键依赖/数据模型）→ 调多模型（codex+gemini analyzer）讨论后选
-- 所有自动决策记录到 `.loop/decisions.jsonl`，用户最后验证时可审查
-
-### 能力 3：状态机/看板
-- `.loop/STATE.yaml` 跨工具追踪 + 5 道安全门（Gate 5 校验与 GSD 状态一致性）
-- `/loop:status` 输出闭环看板
-- 4 道安全门（Gate 1-4）防止跳步/带病上线
-
-### 能力 3：迭代回环（宏观闭环）
-`/loop:retro` 触发：retro → 教训提取 → 里程碑审计 → 差距分析 → 下一轮种子。iteration +1，回到构想，形成螺旋迭代。
-
-### 能力 4：对抗性质量门（v1.1 核心增强）
-每个有产出的环节产出后，执行"检查→提建议→自动优化→重检→通过才进下一步"：
-- **第一层 确定性质量门**：CCG verify-security/quality/change/module（机器判定）
-- **第二层 多模型对抗审查**：codeagent-wrapper 并行调 codex+gemini（绕过 config 缺陷直连，视角互补）
-- 自动优化+重检（最多 3 轮），超限 escalate 停问人
-- 多模型分歧生成对抗讨论记录
-
-### 能力 5：提示词专业化优化（v4.3 新增）
-`/loop:refine` 把用户的一句话需求转化为专业提示词，避免模糊需求导致下游 spec/plan/execute 偏差：
-- **8 维度深度分析**：目标用户 / 核心场景 / 技术栈 / 规模性能 / 鉴权安全 / 优先级MVP / 既有代码约束 / 验收标准
-- **动态追问**：根据提示词精准度生成 3-6 个问题，用 AskUserQuestion 一次并行追问（不臆测缺失维度）
-- **总是生成三套**供用户选（agent 不替选）：
-  - 标准版（日常使用，层级逻辑清晰、执行顺序明确）
-  - 精简版（迭代对话，紧凑结构，快速下发）
-  - 高阶强约束版（AI Agent 强化：强制文件读取清单 + 鉴权逻辑保护 + 原有逻辑保护 + 质量门强制执行）
-- **横切工具**：不依赖 init、不推进闭环（不改 current_phase/step），任何时候都能用
-- 产物 `.loop/refined-prompt.md` 可被 `/office-hours`（Phase 1）读取作为深挖起点
+Loop Engineering strings them together along the "review / build / write / guard / adversarial" functional slices into an **automatically looping pipeline**, embedding a quality gate at each stage, so the user only needs `/loop:run --next --auto` to run the complete loop from ideation through release to retrospective.
 
 ---
 
-## 四、功能需求详述
+## 2. Target Users & Scenarios (目标用户与场景)
 
-### FR-1：状态机（loop-state.md）
-- **FR-1.1** 读写 `.loop/STATE.yaml`，含 7-Phase 状态、iteration、artifacts、history
-- **FR-1.2** 4 道安全门：blocker 检查、产物完整性、QA 通过、对抗检查通过
-- **FR-1.3** `--force` 可跳过安全门（带警告）
-- **FR-1.4** timeline.jsonl 审计日志
+**Target users**: Developers/teams using ZCode (OpenCode kernel) + the above tool families.
 
-### FR-2：编排路由（loop-orchestrate.md）
-- **FR-2.1** 11 条路由按 current_phase + current_step 匹配
-- **FR-2.2** 冲突策略：按阶段唯一裁决（规划用 gstack+OpenSpec，执行用 GSD，审查用 gstack，发布用 gstack）
-- **FR-2.3** `--auto` SlashCommand 自调用循环，每次重读 STATE.yaml
+**Core scenarios**:
+1. Starting a new project from scratch (ideation → delivery full flow)
+2. "Which tool to use" decisions during multi-tool collaboration
+3. Ensuring output quality at each stage (adversarial checks)
+4. Cross-session / cross-milestone iterative closed loop
+5. Interrupt recovery and progress dashboard
 
-### FR-3：对抗质量门（loop-adversarial.md + loop-adversarial.sh）
-- **FR-3.1** 按环节配置检查项（见下表）
-- **FR-3.2** 确定性门判定：security/module 信 exit code；quality/change 脚本二次解析 JSON
-- **FR-3.3** 多模型对抗：并行 codex+gemini，绕过 config 直连，输出隔离
-- **FR-3.4** auto_optimize：综合建议→自动修复→重检，最多 3 轮
-- **FR-3.5** debate：多模型分歧时生成讨论记录，视角互补合议、结论矛盾取保守
-- **FR-3.6** escalate：超限设 blocker 停问人
+---
 
-**各环节检查项配置**：
+## 3. Core Capabilities (Implemented) (核心能力)
 
-| 环节 | 确定性门 | 多模型对抗 | 检查对象 |
-|------|---------|-----------|---------|
+### Capability 1: Fully Autonomous Long-Horizon Closed Loop (v2 core) (能力 1：全自动长程闭环)
+**Design philosophy**: Propose an idea → rough plan → run the entire project automatically (auto-selecting the best option at each decision point), only calling the user for verification at the end.
+- `--auto` (default): fully autonomous, stops only on hard blockers (compilation failure after 3 ineffective rounds / missing dependencies / escalate exceeded / user pause)
+- `--interactive` (optional): conservative mode, stops at every decision point (v1 behavior)
+- 11 routes adjudicate the strongest tool per stage; execute runs plan-by-plan
+
+| Route | Stage | Primary tool |
+|-------|-------|--------------|
+| 1 | Ideation | `/office-hours` |
+| 2 | Spec | `/opsx:propose` |
+| 3 | Design | Triple review (--auto auto-adjudicates disagreements, no stop) |
+| 4-6 | Discuss/Plan/Execute | `/gsd-discuss/plan` + **plan-by-plan execution (gsd-executor)** |
+| 7-9 | Review/QA/Acceptance | `/review`+`/cso` / `/qa` / `/gsd-verify-work` |
+| 10 | Ship | `/ship`→`/canary`→`/land-and-deploy` |
+| 11 | Iterate | `/gsd-complete-milestone` + retro (--auto auto-advances to next round) |
+
+### Capability 2: Tiered Decision-Making (v2) (能力 2：分层决策)
+- **Small decisions** (naming/params/implementation details/non-critical libs) → loop auto-selects best based on spec/context
+- **Large decisions** (architecture/scope/critical dependencies/data models) → multi-model (codex+gemini analyzer) discussion before selecting
+- All auto-decisions recorded to `.loop/decisions.jsonl` for user review at final verification
+
+### Capability 3: State Machine / Dashboard (能力 3：状态机/看板)
+- `.loop/STATE.yaml` cross-tool tracking + 5 safety gates (Gate 5 validates consistency with GSD state)
+- `/loop:status` outputs the closed-loop dashboard
+- 4 safety gates (Gate 1-4) prevent step-skipping / shipping-while-broken
+
+### Capability 3: Iteration Loop (macro closed loop) (能力 3：迭代回环)
+`/loop:retro` triggers: retro → lessons extraction → milestone audit → gap analysis → next-round seed. iteration +1, returns to ideation, forming a spiral iteration.
+
+### Capability 4: Adversarial Quality Gate (v1.1 core enhancement) (能力 4：对抗性质量门)
+After each stage produces output, executes "check → suggest → auto-optimize → re-check → advance only on pass":
+- **Layer 1 Deterministic quality gate**: CCG verify-security/quality/change/module (machine-judged)
+- **Layer 2 Multi-model adversarial review**: codeagent-wrapper parallel-invokes codex+gemini (bypasses config defect to connect directly, complementary perspectives)
+- Auto-optimize + re-check (up to 3 rounds); on exceed, escalate and stop for user
+- Multi-model disagreements generate adversarial discussion records
+
+### Capability 5: Prompt Professionalization (v4.3) (能力 5：提示词专业化优化)
+`/loop:refine` transforms a user's one-sentence requirement into a professional prompt, preventing vague requirements from causing downstream spec/plan/execute drift:
+- **8-dimension deep analysis**: target users / core scenarios / tech stack / scale-performance / auth-security / priority-MVP / existing-code-constraints / acceptance-criteria
+- **Dynamic follow-up questions**: generates 3-6 questions based on prompt precision, asks all in parallel via AskUserQuestion (no guessing missing dimensions)
+- **Always generates three variants** for user to choose (agent does not choose for the user):
+  - Standard (daily use, clear hierarchy, explicit execution order)
+  - Compact (iterative dialogue, tight structure, fast dispatch)
+  - High-constraint (AI Agent hardened: mandatory file-read list + auth-logic protection + existing-logic protection + quality-gate enforcement)
+- **Cross-cutting tool**: independent of init, does not advance the loop (no change to current_phase/step), usable anytime
+- Output `.loop/refined-prompt.md` can be read by `/office-hours` (Phase 1) as a starting point
+
+> **中文译注**：能力 5 是 v4.3 新增的提示词优化器——把用户的一句话需求，通过 8 维度分析 → 动态追问 → 生成三套（标准/精简/高阶强约束）供用户选。横切工具，不依赖 init、不推进闭环。
+
+---
+
+## 4. Functional Requirements Detail (功能需求详述)
+
+### FR-1: State Machine (loop-state.md)
+- **FR-1.1** Read/write `.loop/STATE.yaml`, containing 7-Phase state, iteration, artifacts, history
+- **FR-1.2** 4 safety gates: blocker check, artifact completeness, QA pass, adversarial check pass
+- **FR-1.3** `--force` skips safety gates (with warning)
+- **FR-1.4** timeline.jsonl audit log
+
+### FR-2: Orchestration Routing (loop-orchestrate.md)
+- **FR-2.1** 11 routes match by current_phase + current_step
+- **FR-2.2** Conflict policy: unique adjudication per stage (planning uses gstack+OpenSpec, execution uses GSD, review uses gstack, ship uses gstack)
+- **FR-2.3** `--auto` SlashCommand self-invocation loop, re-reads STATE.yaml each time
+
+### FR-3: Adversarial Quality Gate (loop-adversarial.md + loop-adversarial.sh)
+- **FR-3.1** Per-stage check-item config (see table below)
+- **FR-3.2** Deterministic gate verdict: security/module trusts exit code; quality/change parsed from JSON by script
+- **FR-3.3** Multi-model adversarial: parallel codex+gemini, bypasses config direct-connect, output isolation
+- **FR-3.4** auto_optimize: consolidate suggestions → auto-fix → re-check, up to 3 rounds
+- **FR-3.5** debate: on multi-model disagreement, generate discussion record; complementary perspectives form consensus, contradictory conclusions take conservative
+- **FR-3.6** escalate: on exceed, set blocker and stop for user
+
+**Per-stage check-item config**:
+
+| Stage | Deterministic gate | Multi-model adversarial | Check target |
+|-------|-------------------|------------------------|--------------|
 | spec | verify-change | analyzer | openspec/changes/ |
-| design | — | 审 design-reviews.md | 审核结论 |
-| plan | verify-module | 审 PLAN.md | PLAN.md |
-| execute | security+quality+change | reviewer 审 git diff | 代码变更 |
-| review | security | 对比 gstack 结论 | 审查一致性 |
-| ship | security+module | 终审 | 全量 |
+| design | — | review design-reviews.md | review conclusions |
+| plan | verify-module | review PLAN.md | PLAN.md |
+| execute | security+quality+change | reviewer reviews git diff | code changes |
+| review | security | compare with gstack conclusions | review consistency |
+| ship | security+module | final review | full scope |
 
-### FR-4：迭代回环（loop-iterate.md）
+### FR-4: Iteration Loop (loop-iterate.md)
 - **FR-4.1** `/gsd-complete-milestone` → `/retro` → `/gsd-extract-learnings` → `/gsd-audit-milestone`
-- **FR-4.2** learnings.yaml + gaps.yaml 追加（不覆盖历史）
-- **FR-4.3** 生成下一轮种子，iteration +1，phase 重置
-- **FR-4.4** 默认不自动启动下一轮（需用户确认）
+- **FR-4.2** learnings.yaml + gaps.yaml append (no overwrite of history)
+- **FR-4.3** Generate next-round seed, iteration +1, phase reset
+- **FR-4.4** Does not auto-start next round by default (requires user confirmation)
 
-### FR-5：命令入口
+### FR-5: Command Entry Points
 - `/loop:init` / `/loop:status` / `/loop:run` / `/loop:adversarial` / `/loop:retro`
 
 ---
 
-## 五、非功能需求
+## 5. Non-Functional Requirements (非功能需求)
 
-- **NFR-1 升级免疫**：所有文件在 gstack/GSD/CCG 不管理的路径，升级不覆盖
-- **NFR-2 不碰 CCG**：质量门只调用 run_skill.js + codeagent-wrapper，不改 config/prompts/命令
-- **NFR-3 兼容模型切换**：脚本只调 `--backend codex/gemini`，不管底层路由（cc-switch 切 deepseek-v4/qwen3.7-plus 自动兼容）
-- **NFR-4 GSD 风格**：SKILL.md 极小，逻辑外置 workflow，`@` include + `<step>` 结构
-- **NFR-5 可中断恢复**：状态持久化到 `.loop/`，支持跨会话续跑
-
----
-
-## 六、成功标准
-
-- [x] 11 路由正确按阶段唯一裁决调用工具
-- [x] `--auto` 链式推进且遇 blocker 停止
-- [x] 4 道安全门（含 Gate 4 对抗门）生效
-- [x] 有产出的环节产出后自动跑对抗检查
-- [x] 对抗检查未通过时自动优化+重检（≤3 轮）
-- [x] 多模型分歧生成讨论记录
-- [x] `/loop:retro` 完成宏观回环（教训→种子→下一轮）
-- [x] `/loop:status` 看板准确反映状态
-- [x] 所有文件在升级免疫路径
+- **NFR-1 Upgrade immunity**: All files live in paths not managed by gstack/GSD/CCG, so upgrades don't overwrite them
+- **NFR-2 No touching CCG**: Quality gate only invokes run_skill.js + codeagent-wrapper, never modifies config/prompts/commands
+- **NFR-3 Model-switch compatible**: Script only calls `--backend codex/gemini`, regardless of underlying routing (cc-switch to deepseek-v4/qwen3.7-plus auto-compatible)
+- **NFR-4 GSD style**: SKILL.md minimal, logic externalized to workflows, `@` include + `<step>` structure
+- **NFR-5 Interruptible recovery**: State persisted to `.loop/`, supports cross-session resume
 
 ---
 
-## 七、边界（不做什么）
+## 6. Success Criteria (成功标准)
 
-- **不重造** gstack/GSD/OpenSpec/Superpowers 的任何已有能力
-- **不替代** GSD 的 `.planning/`，而是在其上层编排
-- **不碰** CCG config.toml / prompts / 命令文件
-- **不处理** 同源代理（用户用 cc-switch 解决）
-- **不重造** gstack /review 或 /cso（CCG 对抗层是独立多模型视角，互补不冲突）
-- **不内置** TDD/调试（Superpowers 自动守）
-
-### v4.2 新增能力边界（前端/桌面端支持）
-
-- **必做**：
-  - 前端生命周期完整覆盖（参考→复刻→设计→实现→测试→部署）
-  - 桌面端技术栈自动检测（Electron/Tauri/Wails/Flutter/Web）
-  - 构建验证门确保前端代码可编译（npm run build / tauri build / wails build / flutter build）
-  - 部署配置检查确保 frontend 服务不被 profiles 隐藏
-  - Vue3 业务页面生成（design-html）+ impeccable 品质打磨（21 子 skill）
-  - QA 环节真实浏览器自动化（Playwright 测真实 Vue3 SPA）
-
-- **不做**：
-  - 不生成桌面端原生代码（Electron/tauri.conf.json 等配置文件仍需用户维护）
-  - 不执行完整 Electron/tauri 构建（只跑 `npm run build` + debug 模式，生产构建仍需用户手动 `tauri build`）
-  - 不替代 Electron/Flutter 官方 CLI（只调用其构建命令，不重造）
+- [x] 11 routes correctly adjudicate tools per stage
+- [x] `--auto` chains forward and stops on blockers
+- [x] 4 safety gates (including Gate 4 adversarial gate) take effect
+- [x] Stages with output auto-run adversarial checks after producing
+- [x] Adversarial check failure triggers auto-optimize + re-check (≤3 rounds)
+- [x] Multi-model disagreements generate discussion records
+- [x] `/loop:retro` completes the macro loop (lessons → seed → next round)
+- [x] `/loop:status` dashboard accurately reflects state
+- [x] All files on upgrade-immune paths
 
 ---
 
-## 八、依赖
+## 7. Boundaries (What It Does NOT Do) (边界)
 
-| 依赖 | 用途 | 状态 |
-|------|------|------|
-| gstack 套件 | 构想/审核/QA/安全/部署/复盘 | ✅ 已就绪 |
-| OpenSpec CLI + /opsx | 规格定义 | ✅ 已就绪 |
-| GSD 套件 | 规划/执行/验证/里程碑 | ✅ 已就绪 |
-| Superpowers | TDD/调试自动触发 | ✅ 已就绪 |
-| CCG verify-* | 确定性质量门 | ✅ 已就绪 |
-| codeagent-wrapper + codex/gemini 后端 | 多模型对抗 | ✅ 已就绪（cc-switch 切真异构后更佳） |
+- **Does NOT re-implement** any existing capability of gstack/GSD/OpenSpec/Superpowers
+- **Does NOT replace** GSD's `.planning/`; it orchestrates on top
+- **Does NOT touch** CCG config.toml / prompts / command files
+- **Does NOT handle** same-source agents (user solves via cc-switch)
+- **Does NOT re-implement** gstack /review or /cso (CCG adversarial layer is an independent multi-model perspective, complementary not conflicting)
+- **Does NOT bundle** TDD/debugging (Superpowers guards automatically)
+
+### v4.2 New Capability Boundaries (Frontend/Desktop Support) (v4.2 新增能力边界)
+
+- **MUST do**:
+  - Full frontend lifecycle coverage (reference → replicate → design → implement → test → deploy)
+  - Desktop tech-stack auto-detection (Electron/Tauri/Wails/Flutter/Web)
+  - Build verification gate ensuring frontend code compiles (npm run build / tauri build / wails build / flutter build)
+  - Deploy config check ensuring frontend service not hidden by profiles
+  - Vue3 business-page generation (design-html) + impeccable quality polish (21 sub-skills)
+  - QA stage real-browser automation (Playwright testing real Vue3 SPA)
+
+- **Does NOT**:
+  - Generate desktop native code (Electron/tauri.conf.json config files still maintained by user)
+  - Execute full Electron/tauri build (only runs `npm run build` + debug mode; production build still requires user to manually `tauri build`)
+  - Replace Electron/Flutter official CLI (only invokes their build commands, not re-implementing)
+
+> **中文译注**：v4.2 新增了前端/桌面端能力边界——必做项包括前端全生命周期覆盖、桌面端技术栈检测、构建验证门、Vue3 业务页面生成 + impeccable 品质打磨；不做项包括不生成桌面端原生配置、不执行完整生产构建、不替代官方 CLI。
 
 ---
 
-## 九、演进方向（未来）
+## 8. Dependencies (依赖)
 
-- 支持自定义环节检查项配置（让用户调整各环节跑哪些门）
-- 对抗检查历史趋势分析（同类型问题跨循环出现的频率）
-- 与 GSD `.planning/` 更深度的双向状态同步
-- 支持部分团队跳过对抗门（trust mode）
+| Dependency | Purpose | Status |
+|------------|---------|--------|
+| gstack suite | Ideation/review/QA/security/deploy/retro | ✅ Ready |
+| OpenSpec CLI + /opsx | Spec definition | ✅ Ready |
+| GSD suite | Plan/execute/verify/milestone | ✅ Ready |
+| Superpowers | TDD/debug auto-trigger | ✅ Ready |
+| CCG verify-* | Deterministic quality gate | ✅ Ready |
+| codeagent-wrapper + codex/gemini backends | Multi-model adversarial | ✅ Ready (better after cc-switch to true heterogeneous) |
+
+---
+
+## 9. Future Directions (演进方向)
+
+- Support custom per-stage check-item config (let users tune which gates run at each stage)
+- Adversarial-check history trend analysis (frequency of same-type issues across loops)
+- Deeper two-way state sync with GSD `.planning/`
+- Support teams partially skipping adversarial gates (trust mode)
