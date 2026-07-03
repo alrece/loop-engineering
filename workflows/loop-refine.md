@@ -90,14 +90,58 @@ The three sets MUST cover the same requirement facts; only structure/detail-leve
 </step>
 
 <step name="present">
-Present the three sets of prompts to the user, including each set's **applicable scenario** and **key differences**:
-- Standard: daily use, clear hierarchy and explicit execution order.
-- Compact: for quick dispatch in iterative dialogue, suitable for multi-round interaction.
-- Advanced strict: for AI Agents, hardened with file reads and anti-overshoot.
+**MUST first fully display all three prompts, then let the user choose — never let the user choose blind.**
 
-Use **AskUserQuestion to let the user choose one set** (options: standard / compact / advanced strict).
-The agent MUST NOT choose for the user, and MUST NOT default to the standard version.
-<!-- 中文译注：present——展示三套提示词含每套适用场景和关键差异；用 AskUserQuestion 让用户选一套（标准/精简/高阶强约束）；agent 不得替用户选，不得默认标准版。 -->
+Execution order (strict):
+1. **Fully display three sets** (in the main conversation stream, as normal Markdown text the user can read and scroll):
+   Render them sequentially with clear separators, each set including:
+   - Set name + applicable scenario (1-2 sentences)
+   - **Complete prompt full text** (rendered as a code block ```` ``` ```` or Markdown, the user must be able to read every line)
+   - Key features of this set (1-3 bullet points)
+
+   Template (executed in order):
+   ```
+   ────────────────────────────────────────────
+   📋 Variant 1/3: Standard (daily use)
+   Applicable scenario: {daily use, as project main requirement doc}
+
+   Full prompt:
+   ┌──────────────────────────────────────────┐
+   │ {standard full text — every line shown}  │
+   └──────────────────────────────────────────┘
+
+   Key features: clear hierarchy, explicit execution order
+   ────────────────────────────────────────────
+
+   📋 Variant 2/3: Compact (iterative dialogue)
+   Applicable scenario: {quick dispatch in multi-round iterative dialogue}
+
+   Full prompt:
+   ┌──────────────────────────────────────────┐
+   │ {compact full text — every line shown}   │
+   └──────────────────────────────────────────┘
+
+   Key features: tight structure, fast dispatch
+   ────────────────────────────────────────────
+
+   📋 Variant 3/3: Advanced strict (AI Agent hardened)
+   Applicable scenario: {AI Agent execution, needs file-read + anti-overshoot}
+
+   Full prompt:
+   ┌──────────────────────────────────────────┐
+   │ {advanced full text — every line shown}  │
+   └──────────────────────────────────────────┘
+
+   Key features: mandatory file reads, auth protection, quality gates enforced
+   ────────────────────────────────────────────
+   ```
+
+2. **Then ask the user to choose**: only after the three sets are fully displayed above, use **AskUserQuestion to let the user choose one set** (options: Standard / Compact / Advanced strict).
+   - Each option's `description` field SHOULD include a 1-sentence recap of that set's applicable scenario (for the user to confirm their choice), but the full content already displayed above is the primary reference.
+   - The agent MUST NOT choose for the user, and MUST NOT default to the standard version.
+   - The agent MUST NOT skip step 1 (full display) and jump directly to AskUserQuestion.
+
+<!-- 中文译注：present——【必须先完整展示三套、再让用户选，绝不让用户盲选】。执行顺序严格：(1) 在主对话流里逐套完整展示（用 Markdown 代码块/框把每套完整提示词逐行渲染出来，用户能滚动阅读每一行；每套含适用场景+完整提示词全文+关键特征，用分隔线隔开，编号 1/3 2/3 3/3）；(2) 三套都完整展示完毕后，再用 AskUserQuestion 让用户选一套（选项 description 含该套适用场景一句话回顾，但主要参考是上方已展示的完整内容）。agent 不得替用户选、不得默认标准版、不得跳过步骤 1 直接弹选择框。 -->
 </step>
 
 <step name="persist">

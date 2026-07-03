@@ -77,7 +77,7 @@ Parse the first token to determine mode:
 1. Receive the user's one-sentence requirement (`<text>`), and deeply analyze missing/ambiguous points across 8 dimensions.
 2. Use AskUserQuestion to **dynamically generate 3-6 follow-up questions** (targeting uncovered dimensions, asked once in parallel).
 3. After synthesizing the answers, **always generate three sets** of prompts: standard (daily use) / compact (iterative dialogue) / advanced strict (AI Agent hardened protection).
-4. Use AskUserQuestion to let the user choose one set (**the agent MUST NOT choose for the user**).
+4. **First fully display all three prompts in the conversation** (each set's full text rendered as a code block, the user must be able to read every line), **then** use AskUserQuestion to let the user choose one set (**the agent MUST NOT choose for the user; MUST NOT skip the full display and jump to the selection**).
 5. Write to `.loop/refined-prompt.md` (contains the original prompt / follow-up Q&A / the three full prompts / the selected version).
 6. Suggest next step: `/office-hours` (carrying the refined prompt) or `/loop:run --next`. **Do NOT auto-invoke; do NOT advance the closed loop** (refine is a cross-cutting tool).
 <!-- 中文译注：--refine 提示词专业化优化——接收一句话需求→8 维度分析→动态追问 3-6 个→总是生成三套→用户选→写 refined-prompt.md；不自动调用、不推进闭环（横切工具）。 -->
