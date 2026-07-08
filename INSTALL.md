@@ -83,6 +83,68 @@ chmod +x ~/.claude/skills/loop-engineering/scripts/loop-adversarial.sh
 
 ---
 
+## Deploy to Multiple AI Agents (v4.4)
+
+Loop Engineering natively targets **Claude Code / ZCode**. As of v4.4, adapter-wrapped versions are available for **Cursor**, **Codex**, **Gemini CLI**, and **Codebuddy**.
+
+> **中文译注**：Loop Engineering 原生面向 Claude Code / ZCode。v4.4 起提供 Cursor / Codex / Gemini CLI / Codebuddy 的适配包装版本。
+
+### One-shot install (recommended)
+
+```bash
+# From the repo root — deploys to all detected agent runtimes
+bash adapters/install.sh
+```
+
+The installer auto-detects which agent CLIs are installed (`~/.cursor`, `~/.codex`, `~/.gemini`, `~/.codebuddy`) and deploys the matching adapter to each. Gemini and Codebuddy share a single physical deployment at `~/.agents/skills/loop-engineering/` via symlinks.
+
+> **中文译注**：一键安装——自动检测已安装的 agent CLI，部署对应 adapter。Gemini 和 Codebuddy 共享 `~/.agents/skills/` 的同一份部署（通过 symlink）。
+
+### Install to a specific runtime only
+
+```bash
+bash adapters/install.sh cursor           # Cursor only
+bash adapters/install.sh codex            # Codex only
+bash adapters/install.sh gemini-codebuddy # Gemini + Codebuddy (shared)
+```
+
+### Capability comparison across runtimes
+
+| Capability | Claude Code / ZCode (native) | Cursor | Codex | Gemini / Codebuddy |
+|------------|------------------------------|--------|-------|--------------------|
+| `AskUserQuestion` follow-up | ✅ Native | ⚠ Conversational numbered list | ⚠ `request_user_input` | ⚠ Plain-text prompt |
+| 3-prompt display + selection | ✅ Native | ⚠ Numbered list selection | ⚠ `request_user_input` single-select | ⚠ Plain-text + manual input |
+| `SlashCommand` self-loop | ✅ Native | ⚠ Inline execution | ⚠ inline / `spawn_agent` | ⚠ Inline execution |
+| `@include` workflows | ✅ Native | ✅ `.cursor` path | ✅ `.codex` path | ❌ Inlined (no `@include`) |
+| Adversarial gate script | ✅ Native | ✅ `Shell` | ✅ `run_shell_command` | ✅ `Bash` |
+| Multi-model adversarial | ✅ codex+gemini | ⚠ Degraded (single-model) | ⚠ Degraded (codex itself) | ⚠ Degraded (single-model) |
+
+> **中文译注**：能力对照——原生端功能最完整；cursor/codex 基本完整但交互降级；gemini/codebuddy 降级版（无 @include、纯文本交互、多模型降级为单模型）。完整功能请用 Claude Code / ZCode。
+
+### Adapter architecture
+
+```
+loop-engineering/
+├── SKILL.md                  # canonical (Claude Code / ZCode native)
+├── AGENTS.md
+├── workflows/
+└── adapters/                 # v4.4 multi-agent adapters
+    ├── README.md             # adapter inventory + capability matrix
+    ├── install.sh            # one-shot installer
+    ├── gemini-codebuddy/
+    │   └── SKILL.md          # shared by Gemini + Codebuddy (inlined workflows)
+    ├── cursor/
+    │   └── SKILL.md          # Cursor adapter (<cursor_skill_adapter>)
+    └── codex/
+        └── SKILL.md          # Codex adapter (<codex_skill_adapter>)
+```
+
+Each adapter is a self-contained SKILL.md with runtime-specific frontmatter, adapter block, tool mappings, and include paths. See [`adapters/README.md`](adapters/README.md) for details.
+
+> **中文译注**：每个 adapter 是自包含的 SKILL.md（含运行时专属 frontmatter、adapter 块、工具映射、include 路径）。详见 adapters/README.md。
+
+---
+
 ## Dependencies (must be pre-installed)
 
 loop is an orchestration layer; it does not reinvent capabilities and depends on the following tool families already being installed:

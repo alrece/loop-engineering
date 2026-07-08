@@ -2,7 +2,7 @@
 
 # Loop Engineering
 
-**Version v4.3** · 2026-07 · [Changelog](#changelog) · [Installation Guide](INSTALL.md)
+**Version v4.4** · 2026-07 · [Changelog](#changelog) · [Installation Guide](INSTALL.md)
 
 > **Fully autonomous long-horizon engineering loop**: Pitch an idea → rough plan → run the entire project automatically (decision points pick the best option automatically), and only call the user in for verification at the end.
 >
@@ -384,9 +384,9 @@ All files are on **upgrade-immune paths** (not overwritten by gstack/GSD/CCG upg
 
 ## Changelog
 
-### Current Version: v4.3 (2026-07)
+### Current Version: v4.4 (2026-07)
 
-**Core positioning**: Fully autonomous long-horizon engineering loop + adversarial quality gate + full frontend lifecycle coverage + professional prompt refinement.
+**Core positioning**: Fully autonomous long-horizon engineering loop + adversarial quality gate + full frontend lifecycle coverage + professional prompt refinement + **multi-agent deployment**.
 
 | Capability dimension | Description |
 |---------|------|
@@ -394,13 +394,15 @@ All files are on **upgrade-immune paths** (not overwritten by gstack/GSD/CCG upg
 | Full frontend lifecycle coverage | Replication (Route 3.4) → design decisions (Route 3.5) → implementation+polish (Route 3.6) → real-browser testing |
 | Tiered decision-making | Small decisions made autonomously by loop; large decisions discussed across models (codex+gemini) before selecting |
 | Adversarial quality gate | Every artifact-producing stage runs an adversarial check (deterministic gates + multi-model + frontend checks) |
-| **Professional prompt refinement** | `/loop:refine` one-line requirement → 8-dimension analysis → dynamic follow-up → three variants (new in v4.3) |
+| Professional prompt refinement | `/loop:refine` one-line requirement → 8-dimension analysis → dynamic follow-up → three variants (v4.3) |
+| **Multi-agent deployment** | Cursor / Codex / Gemini / Codebuddy adapters + one-shot installer (new in v4.4) |
 
 ### Version History
 
 | Version | Released | Core improvements | Trigger motivation |
 |------|------|---------|---------|
-| **v4.3** | 2026-07 | Professional prompt refinement (`/loop:refine`: follow-up + three-variant generation) | Vague requirements causing downstream drift |
+| **v4.4** | 2026-07 | Multi-agent deployment (Cursor/Codex/Gemini/Codebuddy adapters + install.sh) | Cross-agent-CLI usage demand |
+| v4.3 | 2026-07 | Professional prompt refinement (`/loop:refine`: follow-up + three-variant generation) | Vague requirements causing downstream drift |
 | v4.2 | 2026-07 | Full design-capability integration + frontend/desktop quality gates | impeccable/taste/ui-ux-pro-max + missing frontend build verification |
 | v4.1 | 2026-06 | Frontend UI replication (reference-repo 7-step reverse engineering) | Replication workflow requirement |
 | v4 | 2026-06 | Frontend lifecycle completion (Route 3.4/3.5/3.6) | No UI after deployment |
@@ -411,7 +413,32 @@ All files are on **upgrade-immune paths** (not overwritten by gstack/GSD/CCG upg
 
 ### Detailed Updates per Version
 
-#### v4.3 (current, 2026-07) — Professional Prompt Refiner
+#### v4.4 (current, 2026-07) — Multi-Agent Deployment
+
+**New capabilities**:
+- ✨ Multi-agent adapters for **Cursor**, **Codex**, **Gemini CLI**, **Codebuddy** (4 agent CLIs beyond Claude Code/ZCode)
+- ✨ `adapters/install.sh` one-shot installer — auto-detects installed runtimes, deploys matching adapter to each
+- ✨ Gemini + Codebuddy share a single physical deployment at `~/.agents/skills/` via symlinks (one copy serves both)
+
+**Adapter design** (see [`adapters/README.md`](adapters/README.md)):
+- **Cursor**: `<cursor_skill_adapter>` A/B/C/D sections (tool mapping: Edit→StrReplace, Bash→Shell; AskUserQuestion→conversational numbered list; Task→Task(subagent_type=...); SlashCommand→inline execution)
+- **Codex**: `<codex_skill_adapter>` A/B/C sections (AskUserQuestion→request_user_input with #3018 fallback; Task→spawn_agent; `/cmd`→`$cmd`)
+- **Gemini+Codebuddy** (shared): inlined workflows (no `@include`), plain-text Q&A, single-model adversarial (degraded)
+
+**Capability degradation matrix**: Non-native runtimes keep core capabilities (orchestration, adversarial gate script, state machine) but degrade interactive features. See [capability comparison table](INSTALL.md#deploy-to-multiple-ai-agents-v44).
+
+**New files**:
+- `adapters/README.md` — adapter inventory + capability matrix
+- `adapters/install.sh` — one-shot installer
+- `adapters/cursor/SKILL.md` — Cursor adapter
+- `adapters/codex/SKILL.md` — Codex adapter
+- `adapters/gemini-codebuddy/SKILL.md` — Gemini+Codebuddy shared adapter (inlined)
+
+**Modified files**:
+- INSTALL.md: added "Deploy to Multiple AI Agents (v4.4)" section
+- README.md / README.zh-CN.md: version bump to v4.4 + this changelog entry
+
+#### v4.3 (2026-07) — Professional Prompt Refiner
 
 **New capabilities**:
 - ✨ `/loop:refine <text>` command: refines a user's one-line requirement into a professional prompt
